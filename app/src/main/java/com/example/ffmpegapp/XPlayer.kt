@@ -7,8 +7,6 @@ import android.view.SurfaceView
 class XPlayer : SurfaceHolder.Callback {
 
     companion object {
-
-        /* TODO 第二节课新增 --- start */ // 错误代码 ================ 如下
         // 打不开视频
         // #define FFMPEG_CAN_NOT_OPEN_URL 1
         private const val FFMPEG_CAN_NOT_OPEN_URL = 1
@@ -44,11 +42,13 @@ class XPlayer : SurfaceHolder.Callback {
 
     var source: String? = null
 
+    var surfaceHolder: SurfaceHolder? = null
+
     var onPreparedListener: OnPreparedListener? = null
 
     var onErrorListener: OnErrorListener? = null
 
-    var surfaceHolder: SurfaceHolder? = null
+    var onProgressListener: OnProgressListener? = null
 
     fun prepare() {
         prepareNative(source)
@@ -95,10 +95,22 @@ class XPlayer : SurfaceHolder.Callback {
         surfaceHolder?.addCallback(this)
     }
 
-    override fun surfaceCreated(surfaceHolder: SurfaceHolder?) {
-        if (surfaceHolder != null) {
+    fun getDuration(): Int {
+        return getDurationNative()
+    }
 
-        }
+    /**
+     * 让jni反射调用进度条
+     */
+    fun onProgress(progress: Int) {
+        onProgressListener?.onProgress(progress)
+    }
+
+    fun seek(playProgress: Int) {
+        seekNative(playProgress)
+    }
+
+    override fun surfaceCreated(surfaceHolder: SurfaceHolder?) {
     }
 
     override fun surfaceChanged(surfaceHolder: SurfaceHolder?, p1: Int, p2: Int, p3: Int) {
@@ -119,11 +131,17 @@ class XPlayer : SurfaceHolder.Callback {
         fun onError(errorCode: String?)
     }
 
+    interface OnProgressListener {
+        fun onProgress(progress: Int)
+    }
+
     private external fun prepareNative(source: String?)
     private external fun startNative()
     private external fun stopNative()
     private external fun releaseNative()
     private external fun setSurfaceNative(surface: Surface)
+    private external fun getDurationNative(): Int
+    private external fun seekNative(progress: Int)
 
 }
 

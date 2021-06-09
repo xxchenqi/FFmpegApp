@@ -11,6 +11,7 @@ JNICallbackHelper::JNICallbackHelper(JavaVM *vm, JNIEnv *env, jobject job) {
     jclass clazz = env->GetObjectClass(job);
     jmd_prepared = env->GetMethodID(clazz, "onPrepared", "()V");
     jmd_onError = env->GetMethodID(clazz, "onError", "(I)V");
+    jmd_onProgress = env->GetMethodID(clazz, "onProgress", "(I)V");
 }
 
 JNICallbackHelper::~JNICallbackHelper() {
@@ -35,9 +36,21 @@ void JNICallbackHelper::onError(int thread_mode, int error_code) {
     if (thread_mode == THREAD_MAIN) {
         env->CallVoidMethod(job, jmd_onError, error_code);
     } else if (thread_mode == THREAD_CHILD) {
-        JNIEnv *env_child = 0;
+        JNIEnv *env_child;
         vm->AttachCurrentThread(&env_child, 0);
         env_child->CallVoidMethod(job, jmd_onError, error_code);
         vm->DetachCurrentThread();
+    }
+}
+
+void JNICallbackHelper::onProgress(int thread_mode, int audio_time) {
+    if (thread_mode == THREAD_MAIN) {
+        env->CallVoidMethod(job, jmd_onProgress, audio_time);
+    } else {
+        JNIEnv *env_child;
+        vm->AttachCurrentThread(&env_child, 0);
+        env_child->CallVoidMethod(job, jmd_onProgress, audio_time);
+        vm->DetachCurrentThread();
+
     }
 }

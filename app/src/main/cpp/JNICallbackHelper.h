@@ -15,12 +15,14 @@ private:
     jobject job;
     jmethodID jmd_prepared;
     jmethodID jmd_onError;
+    jmethodID jmd_onProgress;
 
 public:
     JNICallbackHelper(JavaVM *vm, JNIEnv *env, jobject job);
     ~JNICallbackHelper();
     void onPrepared(int thread_mode);
     void onError(int thread_mode, int error_code);
+    void onProgress(int thread_mode, int audio_time);
 };
 
 #endif //FFMPEGAPP_JNICALLBACKHELPER_H

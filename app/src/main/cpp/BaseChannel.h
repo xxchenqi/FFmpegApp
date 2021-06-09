@@ -11,6 +11,7 @@ extern "C" {
 
 #include "safe_queue.h"
 #include "log4c.h"
+#include "JNICallbackHelper.h"
 
 class BaseChannel {
 public:
@@ -20,6 +21,7 @@ public:
     bool isPlaying;
     AVCodecContext *codecContext = 0;
     AVRational time_base;
+    JNICallbackHelper *jniCallbackHelper = 0;
 
     BaseChannel(int stream_index, AVCodecContext *codecContext, AVRational time_base);
 
@@ -28,6 +30,8 @@ public:
     static void releaseAVPacket(AVPacket **p);
 
     static void releaseAVFrame(AVFrame **f);
+
+    void setJNICallbackHelper(JNICallbackHelper *jniCallbackHelper);
 };
 
 #endif //FFMPEGAPP_BASECHANNEL_H

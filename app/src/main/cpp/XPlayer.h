@@ -21,6 +21,9 @@ private:
     JNICallbackHelper *helper = 0;
     bool isPlaying; // 是否播放
     RenderCallback renderCallback;
+    int duration;
+    pthread_mutex_t seek_mutex;
+    pthread_t pid_stop;
 
 public:
     XPlayer(const char *source, JNICallbackHelper *jniCallbackHelper);
@@ -36,6 +39,14 @@ public:
     void start_();
 
     void setRenderCallback(RenderCallback renderCallback);
+
+    int getDuration();
+
+    void seek(int progress);
+
+    void stop();
+
+    void stop_(XPlayer *pPlayer);
 };
 
 

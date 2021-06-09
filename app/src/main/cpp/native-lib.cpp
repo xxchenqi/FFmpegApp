@@ -22,7 +22,7 @@ void renderFrame(uint8_t *src_data, int width, int height, int src_lineSize) {
     if (!window) {
         pthread_mutex_unlock(&mutex);
     }
-    if(window == nullptr) return;
+    if (window == nullptr) return;
     //设置窗口的大小
     ANativeWindow_setBuffersGeometry(window, width, height, WINDOW_FORMAT_RGBA_8888);
 
@@ -68,13 +68,23 @@ Java_com_example_ffmpegapp_XPlayer_startNative(JNIEnv *env, jobject thiz) {
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ffmpegapp_XPlayer_stopNative(JNIEnv *env, jobject thiz) {
-
+    if (player) {
+        player->stop();
+    }
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_ffmpegapp_XPlayer_releaseNative(JNIEnv *env, jobject thiz) {
-
+    pthread_mutex_lock(&mutex);
+    if (window) {
+        ANativeWindow_release(window);
+        window = nullptr;
+    }
+    pthread_mutex_unlock(&mutex);
+    DELETE(player)
+    DELETE(vm)
+    DELETE(window)
 }
 
 extern "C"
@@ -91,4 +101,18 @@ Java_com_example_ffmpegapp_XPlayer_setSurfaceNative(JNIEnv *env, jobject thiz, j
     window = ANativeWindow_fromSurface(env, surface);
     pthread_mutex_unlock(&mutex);
 
+}extern "C"
+
+JNIEXPORT jint JNICALL
+Java_com_example_ffmpegapp_XPlayer_getDurationNative(JNIEnv *env, jobject thiz) {
+    if (player) {
+        return player->getDuration();
+    }
+    return 0;
+}extern "C"
+JNIEXPORT void JNICALL
+Java_com_example_ffmpegapp_XPlayer_seekNative(JNIEnv *env, jobject thiz, jint progress) {
+    if (player) {
+        player->seek(progress);
+    }
 }

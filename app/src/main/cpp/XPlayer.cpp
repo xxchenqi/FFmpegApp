@@ -6,6 +6,7 @@ XPlayer::XPlayer(const char *source, JNICallbackHelper *jniCallbackHelper) {
     this->source = new char[strlen(source) + 1];
     this->helper = jniCallbackHelper;
     strcpy(this->source, source);
+    pthread_mutex_init(&seek_mutex, nullptr);
 }
 
 XPlayer::~XPlayer() {
@@ -54,6 +55,9 @@ void XPlayer::prepare_() {
         return;
     }
 
+    //转成有理数
+    this->duration = formatContext->duration / AV_TIME_BASE;
+
     //遍历流的个数
     for (int i = 0; i < formatContext->nb_streams; ++i) {
         //获取媒体流（音频，视频）
@@ -98,8 +102,10 @@ void XPlayer::prepare_() {
 
         if (parameters->codec_type == AVMediaType::AVMEDIA_TYPE_AUDIO) {
             audioChannel = new AudioChannel(i, codecContext, time_base);
+            if (this->duration != 0) {
+                audioChannel->setJNICallbackHelper(helper);
+            }
         } else if (parameters->codec_type == AVMediaType::AVMEDIA_TYPE_VIDEO) {
-
             // 视频类型,有一帧封面
             if (stream->disposition & AV_DISPOSITION_ATTACHED_PIC) {
                 continue;
@@ -178,5 +184,83 @@ void XPlayer::start_() {
 
 void XPlayer::setRenderCallback(RenderCallback renderCallback) {
     this->renderCallback = renderCallback;
+}
+
+int XPlayer::getDuration() {
+    return duration;
+}
+
+void XPlayer::seek(int progress) {
+    // 健壮性判断
+    if (progress < 0 || progress > duration) {
+        return;
+    }
+    if (!audioChannel && !videoChannel) {
+        return;
+    }
+    if (!formatContext) {
+        return;
+    }
+
+    pthread_mutex_lock(&seek_mutex);
+
+
+    int r = av_seek_frame(formatContext, -1, progress * AV_TIME_BASE, AVSEEK_FLAG_FRAME);
+    if (r < 0) {
+        return;
+    }
+
+    if (audioChannel) {
+        audioChannel->packets.setWork(0);
+        audioChannel->frames.setWork(0);
+        audioChannel->packets.clear();
+        audioChannel->frames.clear();
+        audioChannel->packets.setWork(1);
+        audioChannel->frames.setWork(1);
+    }
+    if (videoChannel) {
+        videoChannel->packets.setWork(0);
+        videoChannel->frames.setWork(0);
+        videoChannel->packets.clear();
+        videoChannel->frames.clear();
+        videoChannel->packets.setWork(1);
+        videoChannel->frames.setWork(1);
+    }
+
+    pthread_mutex_unlock(&seek_mutex);
+
+}
+
+void *task_stop(void *args) {
+    auto *player = static_cast<XPlayer *>(args);
+    player->stop_(player);
+    return nullptr; // 必须返回，坑，错误很难找
+}
+
+void XPlayer::stop() {
+    helper = nullptr;
+    if (audioChannel) {
+        audioChannel->jniCallbackHelper = nullptr;
+    }
+    if (videoChannel) {
+        videoChannel->jniCallbackHelper = nullptr;
+    }
+
+    //我们要等这两个线程,稳定停下来后在做释放,所以放到子线程去等待
+    pthread_create(&pid_stop, nullptr, task_stop, this);
+}
+
+void XPlayer::stop_(XPlayer *pPlayer) {
+    isPlaying = false;
+    pthread_join(pid_prepare, nullptr);
+    pthread_join(pid_start, nullptr);
+    if(formatContext){
+        avformat_close_input(&formatContext);
+        avformat_free_context(formatContext);
+        formatContext = nullptr;
+    }
+    DELETE(audioChannel)
+    DELETE(videoChannel)
+    DELETE(pPlayer)
 }
 

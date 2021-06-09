@@ -31,3 +31,7 @@ void BaseChannel::releaseAVFrame(AVFrame **f) {
         *f = 0;
     }
 }
+
+void BaseChannel::setJNICallbackHelper(JNICallbackHelper *jniCallbackHelper) {
+    this->jniCallbackHelper = jniCallbackHelper;
+}

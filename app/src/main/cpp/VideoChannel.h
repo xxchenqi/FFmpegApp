@@ -27,6 +27,8 @@ private:
 public:
     VideoChannel(int streamIndex, AVCodecContext *codecContext, AVRational time_base, int fps);
 
+    ~VideoChannel();
+
     void stop();
 
     void start();

@@ -39,6 +39,10 @@ AudioChannel::AudioChannel(int streamIndex, AVCodecContext *codecContext, AVRati
 }
 
 AudioChannel::~AudioChannel() {
+    if (swr_ctx) {
+        swr_free(&swr_ctx);
+    }
+    DELETE(out_buffers)
 
 }
 
@@ -285,5 +289,40 @@ void AudioChannel::audio_play() {
 
 
 void AudioChannel::stop() {
+    pthread_join(pid_audio_decode, nullptr);
+    pthread_join(pid_audio_play, nullptr);
 
+    isPlaying = false;
+    packets.setWork(0);
+    frames.setWork(0);
+
+    // 7.1 设置停止状态
+    if (bqPlayerPlay) {
+        (*bqPlayerPlay)->SetPlayState(bqPlayerPlay, SL_PLAYSTATE_STOPPED);
+        bqPlayerPlay = nullptr;
+    }
+
+    // 7.2 销毁播放器
+    if (bqPlayerObject) {
+        (*bqPlayerObject)->Destroy(bqPlayerObject);
+        bqPlayerObject = nullptr;
+        bqPlayerBufferQueue = nullptr;
+    }
+
+    // 7.3 销毁混音器
+    if (outputMixObject) {
+        (*outputMixObject)->Destroy(outputMixObject);
+        outputMixObject = nullptr;
+    }
+
+    // 7.4 销毁引擎
+    if (engineObject) {
+        (*engineObject)->Destroy(engineObject);
+        engineObject = nullptr;
+        engineInterface = nullptr;
+    }
+
+    // 队列清空
+    packets.clear();
+    frames.clear();
 }

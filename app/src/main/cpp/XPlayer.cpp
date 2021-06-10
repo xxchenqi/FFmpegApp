@@ -12,10 +12,14 @@ XPlayer::XPlayer(const char *source, JNICallbackHelper *jniCallbackHelper) {
 XPlayer::~XPlayer() {
     if (source) {
         delete source;
+        source = nullptr;
     }
     if (helper) {
         delete helper;
+        helper = nullptr;
     }
+
+    pthread_mutex_destroy(&seek_mutex);
 }
 
 void *task_prepare(void *args) {
@@ -43,6 +47,7 @@ void XPlayer::prepare_() {
             helper->onError(THREAD_CHILD, FFMPEG_CAN_NOT_OPEN_URL);
             // char * errorInfo = av_err2str(r); // 根据你的返回值 得到错误详情
         }
+        avformat_close_input(&formatContext);
         return;
     }
 
@@ -52,12 +57,13 @@ void XPlayer::prepare_() {
         if (helper) {
             helper->onError(THREAD_CHILD, FFMPEG_CAN_NOT_FIND_STREAMS);
         }
+        avformat_close_input(&formatContext);
         return;
     }
 
     //转成有理数
     this->duration = formatContext->duration / AV_TIME_BASE;
-
+    AVCodecContext *codecContext = nullptr;
     //遍历流的个数
     for (int i = 0; i < formatContext->nb_streams; ++i) {
         //获取媒体流（音频，视频）
@@ -70,14 +76,19 @@ void XPlayer::prepare_() {
             if (helper) {
                 helper->onError(THREAD_CHILD, FFMPEG_FIND_DECODER_FAIL);
             }
+            avformat_close_input(&formatContext);
+            return;
         }
 
         //创建编解码器上下文
-        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
+        codecContext = avcodec_alloc_context3(codec);
         if (!codecContext) {
             if (helper) {
                 helper->onError(THREAD_CHILD, FFMPEG_ALLOC_CODEC_CONTEXT_FAIL);
             }
+            //释放了codecContext,codec也会一起释放
+            avcodec_free_context(&codecContext);
+            avformat_close_input(&formatContext);
             return;
         }
         //设置解码器上下文参数
@@ -86,6 +97,8 @@ void XPlayer::prepare_() {
             if (helper) {
                 helper->onError(THREAD_CHILD, FFMPEG_CODEC_CONTEXT_PARAMETERS_FAIL);
             }
+            avcodec_free_context(&codecContext);
+            avformat_close_input(&formatContext);
             return;
         }
         //打开解码器
@@ -94,6 +107,8 @@ void XPlayer::prepare_() {
             if (helper) {
                 helper->onError(THREAD_CHILD, FFMPEG_OPEN_DECODER_FAIL);
             }
+            avcodec_free_context(&codecContext);
+            avformat_close_input(&formatContext);
             return;
         }
 
@@ -121,6 +136,10 @@ void XPlayer::prepare_() {
         if (helper) {
             helper->onError(THREAD_CHILD, FFMPEG_NOMEDIA);
         }
+        if (codecContext) {
+            avcodec_free_context(&codecContext);
+        }
+        avformat_close_input(&formatContext);
         return;
     }
 
@@ -254,7 +273,7 @@ void XPlayer::stop_(XPlayer *pPlayer) {
     isPlaying = false;
     pthread_join(pid_prepare, nullptr);
     pthread_join(pid_start, nullptr);
-    if(formatContext){
+    if (formatContext) {
         avformat_close_input(&formatContext);
         avformat_free_context(formatContext);
         formatContext = nullptr;

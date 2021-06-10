@@ -36,7 +36,15 @@ VideoChannel::VideoChannel(int streamIndex, AVCodecContext *codecContext, AVRati
 
 
 void VideoChannel::stop() {
+    pthread_join(pid_video_decode, nullptr);
+    pthread_join(pid_video_play, nullptr);
 
+    isPlaying = false;
+    packets.setWork(0);
+    frames.setWork(0);
+
+    packets.clear();
+    frames.clear();
 }
 
 
@@ -182,4 +190,8 @@ void VideoChannel::setRenderCallback(RenderCallback renderCallback) {
 
 void VideoChannel::setAudioChannel(AudioChannel *audio_channel) {
     this->audio_channel = audio_channel;
+}
+
+VideoChannel::~VideoChannel() {
+    DELETE(audio_channel)
 }
